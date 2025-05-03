@@ -1,0 +1,129 @@
+.room-detail-container {
+  max-width: 600px;
+  margin: 100px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.room-detail-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+
+  h1 {
+    font-size: 1.8rem;
+    color: #333;
+  }
+}
+
+.detail-content {
+  .room-detail-item {
+    margin-bottom: 15px;
+
+    h2 {
+      font-size: 1.2rem;
+      color: #666;
+    }
+
+    p {
+      font-size: 1rem;
+      color: #333;
+    }
+
+    input,
+    select {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      color: #333;
+      width: 100%;
+      margin-top: 8px;
+
+      &:focus {
+        border-color: #4caf50;
+        outline: none;
+      }
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      font-size: 1rem;
+      color: #4caf50;
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      &.active {
+        .status-dot {
+          background-color: #4caf50;
+        }
+      }
+
+      &.inactive {
+        .status-dot {
+          background-color: #f44336;
+        }
+      }
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+
+      &.edit {
+        background-color: #4caf50;
+        color: white;
+
+        &:hover {
+          background-color: darken(#4caf50, 10%);
+        }
+      }
+
+      &.save {
+        background-color: #4caf50;
+        color: white;
+
+        &:hover {
+          background-color: darken(#4caf50, 10%);
+        }
+      }
+
+      &.cancel {
+        background-color: #f44336;
+        color: white;
+
+        &:hover {
+          background-color: darken(#f44336, 10%);
+        }
+      }
+
+      &.close {
+        background-color: #2196f3;
+        color: white;
+
+        &:hover {
+          background-color: darken(#2196f3, 10%);
+        }
+      }
+    }
+  }
+}
