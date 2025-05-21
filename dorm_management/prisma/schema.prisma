@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  firstname   String
+  middlename  String?
+  lastname    String
+  username    String    @unique
+  password    String
+  type        String
+  dateCreated DateTime  @default(now()) @map("date_created")
+  dateUpdated DateTime? @map("date_updated")
+  deleteFlag  Boolean   @default(false) @map("delete_flag")
+
+  @@map("dorm.users")
+}
+
+model Student {
+  id                Int       @id @default(autoincrement())
+  code              String    @unique
+  firstname         String
+  middlename        String?
+  lastname          String
+  department        String
+  course            String
+  gender            String
+  contact           String
+  email             String
+  address           String
+  emergencyName     String    @map("emergency_name")
+  emergencyContact  String    @map("emergency_contact")
+  emergencyAddress  String    @map("emergency_address")
+  emergencyRelation String    @map("emergency_relation")
+  dateCreated       DateTime  @default(now()) @map("date_created")
+  dateUpdated       DateTime? @map("date_updated")
+  deleteFlag        Boolean   @default(false) @map("delete_flag")
+
+  account Account?
+
+  @@map("dorm.student_list")
+}
+
+model Dorm {
+  id          Int       @id @default(autoincrement())
+  name        String
+  status      String
+  dateCreated DateTime  @default(now()) @map("date_created")
+  dateUpdated DateTime? @map("date_updated")
+  deleteFlag  Boolean   @default(false) @map("delete_flag")
+
+  rooms Room[]
+
+  @@map("dorm.dorm_list")
+}
+
+model Room {
+  id          Int       @id @default(autoincrement())
+  name        String
+  dormId      Int       @map("dorm_id")
+  slots       Int
+  price       Float
+  status      String
+  dateCreated DateTime  @default(now()) @map("date_created")
+  dateUpdated DateTime? @map("date_updated")
+  deleteFlag  Boolean   @default(false) @map("delete_flag")
+
+  dorm     Dorm      @relation(fields: [dormId], references: [id])
+  accounts Account[]
+
+  @@map("dorm.room_list")
+}
+
+model Account {
+  id          Int       @id @default(autoincrement())
+  studentId   Int       @unique @map("student_id")
+  roomId      Int       @map("room_id") // KHÔNG CÓ @unique
+  status      Int
+  dateCreated DateTime  @default(now()) @map("date_created")
+  dateUpdated DateTime? @map("date_updated")
+  deleteFlag  Boolean   @default(false) @map("delete_flag")
+
+  student  Student       @relation(fields: [studentId], references: [id])
+  room     Room          @relation(fields: [roomId], references: [id])
+  payments PaymentList[]
+
+  @@map("dorm.account_list")
+}
+
+model PaymentList {
+  id          Int      @id @default(autoincrement())
+  accountId   Int      @map("account_id")
+  monthOf     String   @map("month_of")
+  amount      Float
+  note        String?
+  dateCreated DateTime @default(now()) @map("date_created")
+  dateUpdated DateTime @default(now()) @map("date_updated")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("dorm.payment_list")
+}

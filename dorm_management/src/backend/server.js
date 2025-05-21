@@ -3,6 +3,14 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const { Pool } = require("pg");
 
+// Import routes
+const studentRoutes = require("./routes/studentRoutes");
+const dormRoutes = require("./routes/dormRoutes");
+const roomRoutes = require("./routes/roomRoutes");
+const userRoutes = require("./routes/userRoutes");
+const accountRoutes = require("./routes/accountRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+
 const app = express();
 const port = 5000;
 
@@ -18,6 +26,14 @@ const pool = new Pool({
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// Routes
+app.use("/students", studentRoutes);
+app.use("/dorms", dormRoutes);
+app.use("/rooms", roomRoutes);
+app.use("/users", userRoutes);
+app.use("/accounts", accountRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 // GET: Lấy danh sách sinh viên
 app.get("/students", async (req, res) => {
@@ -83,8 +99,15 @@ app.get("/accounts", async (req, res) => {
         s.firstname,
         s.middlename,
         s.lastname,
+        s.department,
+        s.course,
+        s.gender,
+        s.contact,
+        s.email,
+        s.address,
         d.name AS dorm,
         r.name AS room,
+        r.price,
         CASE 
             WHEN a.status = 1 THEN 'Active'
             ELSE 'Inactive'
@@ -154,6 +177,106 @@ app.post("/students", async (req, res) => {
   } catch (error) {
     console.error("Error inserting student:", error);
     res.status(500).send("Internal Server Error");
+  }
+});
+
+// GET: Lấy thông tin user cụ thể
+app.get("/users/:id", async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const result = await pool.query("SELECT * FROM dorm.users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
+});
+
+// PUT: Update user information
+app.put("/users/:id", async (req, res) => {
+  const userId = req.params.id;
+  const { firstname, middlename, lastname, username, password, type } =
+    req.body;
+
+  console.log("Update user request:", {
+    userId,
+    body: req.body,
+  });
+
+  try {
+    // First check if user exists
+    const checkUser = await pool.query(
+      "SELECT * FROM dorm.users WHERE id = $1",
+      [userId]
+    );
+
+    if (checkUser.rows.length === 0) {
+      console.log("User not found:", userId);
+      return res.status(404).send("User not found");
+    }
+
+    // If password is not provided, keep the existing password
+    let updateQuery;
+    let queryParams;
+
+    if (!password) {
+      updateQuery = `
+        UPDATE dorm.users 
+        SET firstname = $1, middlename = $2, lastname = $3, 
+            username = $4, type = $5,
+            date_updated = CURRENT_TIMESTAMP
+        WHERE id = $6
+        RETURNING *`;
+      queryParams = [
+        firstname,
+        middlename || null,
+        lastname,
+        username,
+        type,
+        userId,
+      ];
+    } else {
+      updateQuery = `
+        UPDATE dorm.users 
+        SET firstname = $1, middlename = $2, lastname = $3, 
+            username = $4, password = $5, type = $6,
+            date_updated = CURRENT_TIMESTAMP
+        WHERE id = $7
+        RETURNING *`;
+      queryParams = [
+        firstname,
+        middlename || null,
+        lastname,
+        username,
+        password,
+        type,
+        userId,
+      ];
+    }
+
+    console.log("Executing query:", updateQuery);
+    console.log("With params:", queryParams);
+
+    const result = await pool.query(updateQuery, queryParams);
+
+    console.log("Update result:", result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating user:", {
+      message: error.message,
+      detail: error.detail,
+      code: error.code,
+      stack: error.stack,
+    });
+    res.status(500).send(error.message || "Internal Server Error");
   }
 });
 
@@ -227,6 +350,87 @@ app.put("/students/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error updating student:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// PUT: Cập nhật thông tin ký túc xá
+app.put("/dorms/:id", async (req, res) => {
+  const dormId = req.params.id;
+  const { name, status } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE dorm.dorm_list 
+       SET name = $1, status = $2
+       WHERE id = $3 AND delete_flag = 0
+       RETURNING *`,
+      [name, status, dormId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send("Dorm not found or already deleted");
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating dorm:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// PUT: Cập nhật thông tin phòng
+app.put("/rooms/:id", async (req, res) => {
+  const roomId = req.params.id;
+  const { dorm, room, slot, available, price, status } = req.body;
+
+  try {
+    // Lấy dorm_id từ tên ký túc xá
+    const dormResult = await pool.query(
+      "SELECT id FROM dorm.dorm_list WHERE name = $1 AND delete_flag = 0",
+      [dorm]
+    );
+
+    if (dormResult.rows.length === 0) {
+      return res.status(404).send("Dorm not found");
+    }
+
+    const dormId = dormResult.rows[0].id;
+
+    // Cập nhật thông tin phòng
+    const result = await pool.query(
+      `UPDATE dorm.room_list 
+       SET name = $1, dorm_id = $2, slots = $3, price = $4, status = $5
+       WHERE id = $6 AND delete_flag = 0
+       RETURNING *`,
+      [room, dormId, slot, price, status, roomId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send("Room not found or already deleted");
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating room:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// GET: Lấy lịch sử thanh toán theo account_id
+app.get("/api/payment/history/:accountId", async (req, res) => {
+  const { accountId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT id, account_id, month_of, amount, date_created, date_updated
+       FROM dorm.payment_list
+       WHERE account_id = $1
+       ORDER BY date_created DESC`,
+      [accountId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching payment history:", error);
     res.status(500).send("Internal Server Error");
   }
 });
