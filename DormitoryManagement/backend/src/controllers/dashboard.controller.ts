@@ -9,19 +9,101 @@ const dashboardService = new DashboardService();
 
 export class DashboardController {
   // Lấy các số liệu thống kê tổng quan
-  async getStats(_req: Request, res: Response, next: NextFunction) { // Thêm next
+  async getStats(req: Request, res: Response, next: NextFunction) { // Thêm next
     try {
+      const userId = req.user?.userId;
+      const role = req.user?.role;
+      let buildingId: number | null = null;
+
+      // Nếu là STAFF, lấy buildingId dựa trên email
+      if (role === 'STAFF' && userId) {
+        const email = req.user?.email;
+        if (email) {
+          buildingId = email === 'staff.b3@example.com' ? 1 : 
+                       email === 'staff.b9@example.com' ? 2 : null;
+        }
+      }
+
       // Sử dụng service để lấy dữ liệu thống kê
       const stats = await dashboardService.getStats();
 
       // Lấy thêm thông tin về số phòng trống
       const availableRooms = await prisma.room.count({
-        where: { status: 'AVAILABLE' }
+        where: {
+          status: 'AVAILABLE',
+          ...(buildingId ? { buildingId } : {})
+        }
       });
 
+      // Lấy thông tin về số lượng sinh viên
+      const totalStudents = buildingId ? await prisma.studentProfile.count({
+        where: {
+          OR: [
+            // Sinh viên hiện tại đang ở trong tòa nhà
+            {
+              room: {
+                buildingId: {
+                  equals: buildingId
+                }
+              }
+            },
+            // Sinh viên đã từng sống trong tòa nhà
+            {
+              room: {
+                buildingId: {
+                  equals: buildingId
+                }
+              }
+            }
+          ]
+        }
+      }) : await prisma.studentProfile.count();
+
       // Lấy thông tin về hóa đơn chưa thanh toán
-      const unpaidInvoices = await prisma.invoice.count({
-        where: { status: 'UNPAID' }
+      const unpaidInvoices = buildingId ? await prisma.invoice.count({
+        where: {
+          status: 'UNPAID',
+          OR: [
+            // Hóa đơn của các sinh viên hiện tại đang ở trong tòa nhà
+            {
+              room: {
+                buildingId: {
+                  equals: buildingId
+                }
+              }
+            },
+            // Hóa đơn của các sinh viên đã từng sống trong tòa nhà
+            {
+              studentProfile: {
+                room: {
+                  buildingId: {
+                    equals: buildingId
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }) : await prisma.invoice.count({
+        where: {
+          status: 'UNPAID'
+        }
+      });
+
+      // Lấy thông tin về số lượng yêu cầu bảo trì đang chờ xử lý
+      const pendingMaintenance = buildingId ? await prisma.maintenance.count({
+        where: {
+          status: 'PENDING',
+          room: {
+            buildingId: {
+              equals: buildingId
+            }
+          }
+        }
+      }) : await prisma.maintenance.count({
+        where: {
+          status: 'PENDING'
+        }
       });
 
       res.status(200).json({ // Thêm status code và chuẩn hóa response
@@ -29,7 +111,9 @@ export class DashboardController {
         data: {
           ...stats,
           availableRooms,
-          unpaidInvoices
+          unpaidInvoices,
+          totalStudents,
+          pendingMaintenance
         }
       });
     } catch (error) {

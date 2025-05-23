@@ -1,16 +1,1 @@
-node_modules/
-npm-debug.log*
-
-# Build
-dist/
-build/
-.env
-*.env
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
+node_modules

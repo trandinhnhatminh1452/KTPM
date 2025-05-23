@@ -108,11 +108,12 @@ export class TransferService {
             }
             if (toRoom.actualOccupancy >= toRoom.capacity) {
                 throw new Error(`Phòng muốn chuyển đến (${toRoom.id}) đã đầy.`);
-            }            // Chỉ kiểm tra xem có yêu cầu nào đang ở trạng thái PENDING không
+            }
+
             const pendingTransfer = await prisma.roomTransfer.findFirst({
                 where: {
                     studentProfileId: data.studentProfileId,
-                    status: TransferStatus.PENDING
+                    status: { in: [TransferStatus.PENDING, TransferStatus.APPROVED] }
                 }
             });
             if (pendingTransfer) {
@@ -190,8 +191,7 @@ export class TransferService {
                     approvedBy: data.approvedById ? { connect: { id: data.approvedById } } : (data.status === TransferStatus.REJECTED ? { disconnect: true } : undefined)
                 };
 
-                // Cập nhật khi trạng thái là APPROVED hoặc COMPLETED
-                if (data.status === TransferStatus.APPROVED || data.status === TransferStatus.COMPLETED) {
+                if (data.status === TransferStatus.COMPLETED) {
                     const studentId = currentTransfer.studentProfileId;
                     const fromRoomId = currentTransfer.fromRoomId;
                     const toRoomId = currentTransfer.toRoomId;
@@ -201,7 +201,6 @@ export class TransferService {
                         throw new Error(`Không thể hoàn thành: Phòng mới (${toRoomId}) không còn chỗ hoặc không khả dụng.`);
                     }
 
-                    // Cập nhật roomId của sinh viên
                     await tx.studentProfile.update({ where: { id: studentId }, data: { roomId: toRoomId } });
 
                     if (fromRoomId) {

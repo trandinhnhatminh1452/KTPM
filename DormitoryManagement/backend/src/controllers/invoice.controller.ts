@@ -10,50 +10,56 @@ const prisma = new PrismaClient();
 const invoiceService = new InvoiceService();
 
 export class InvoiceController {
+
     async getAllInvoices(req: Request, res: Response, next: NextFunction) {
         try {
             const {
                 studentProfileId, roomId, status, month, year, page, limit,
-                invoiceNumber, identifier, invoiceType // Thêm tham số tìm kiếm mới: loại hóa đơn
+                invoiceNumber, identifier // Thêm tham số tìm kiếm mới
             } = req.query;
 
-            const options: Prisma.InvoiceFindManyArgs = { where: {} };            // Nếu người dùng là STUDENT, chỉ cho phép xem hóa đơn của bản thân hoặc phòng của họ
-            if (req.user && typeof req.user === 'object' && 'role' in req.user && req.user.role === 'STUDENT') {
-                console.log('User object:', req.user); // Debug
-                const studentProfileId = 'profileId' in req.user ? Number(req.user.profileId) : undefined;
+            const options: Prisma.InvoiceFindManyArgs = { where: {} };
 
-                if (studentProfileId) {
-                    // Lấy thông tin phòng của sinh viên
-                    const student = await prisma.studentProfile.findUnique({
-                        where: { id: studentProfileId },
-                        select: { roomId: true }
+            // Nếu là nhân viên quản lý, chỉ hiển thị hóa đơn của tòa nhà mà họ quản lý
+            if (req.user?.role === 'STAFF') {
+                // Lấy thông tin tòa nhà quản lý từ database thông qua userId
+                const staffProfile = await prisma.staffProfile.findUnique({
+                    where: { userId: req.user.userId },
+                    select: { managedBuildingId: true }
+                });
+                
+                if (staffProfile?.managedBuildingId) {
+                    // Lấy danh sách studentId của các sinh viên đang ở trong tòa nhà này
+                    const studentIds = await prisma.studentProfile.findMany({
+                        where: {
+                            room: {
+                                buildingId: staffProfile.managedBuildingId
+                            }
+                        },
+                        select: { id: true }
                     });
 
-                    // Chỉ cho phép xem hóa đơn của bản thân hoặc phòng của họ
-                    options.where!.OR = [
-                        { studentProfileId: studentProfileId },
-                        { roomId: student?.roomId || -1 } // Nếu không có phòng thì dùng -1 (không tồn tại)
-                    ];
-                } else {
-                    // Nếu không có profileId, không cho phép xem hóa đơn nào
-                    options.where!.id = -1;
+                    // Tạo điều kiện OR để lọc theo room hoặc studentProfile
+                    options.where = {
+                        OR: [
+                            {
+                                room: {
+                                    buildingId: staffProfile.managedBuildingId
+                                }
+                            },
+                            {
+                                studentProfileId: {
+                                    in: studentIds.map(s => s.id)
+                                }
+                            }
+                        ]
+                    };
                 }
-            } else {
-                // Đối với ADMIN/STAFF, xây dựng bộ lọc bình thường
-                if (studentProfileId) options.where!.studentProfileId = parseInt(studentProfileId as string);
-                if (roomId) options.where!.roomId = parseInt(roomId as string);
-            }            // Lọc theo loại hóa đơn (cá nhân hoặc phòng)
-            if (invoiceType === 'personal') {
-                // Chỉ lấy hóa đơn cá nhân (có studentProfileId)
-                options.where!.studentProfileId = { not: null };
-                options.where!.roomId = null;
-            } else if (invoiceType === 'room') {
-                // Chỉ lấy hóa đơn phòng (có roomId)
-                options.where!.roomId = { not: null };
-                options.where!.studentProfileId = null;
             }
 
-            // Các bộ lọc chung cho tất cả vai trò
+            // Xây dựng bộ lọc
+            if (studentProfileId) options.where!.studentProfileId = parseInt(studentProfileId as string);
+            if (roomId) options.where!.roomId = parseInt(roomId as string);
             if (status) options.where!.status = status as InvoiceStatus; // Cần validate enum
             if (month) options.where!.billingMonth = parseInt(month as string);
             if (year) options.where!.billingYear = parseInt(year as string);
@@ -127,39 +133,12 @@ export class InvoiceController {
         } catch (error) {
             next(error);
         }
-    } async getInvoiceById(req: Request, res: Response, next: NextFunction) {
+    }
+
+    async getInvoiceById(req: Request, res: Response, next: NextFunction) {
         try {
             const id = parseInt(req.params.id);
             const invoice = await invoiceService.findById(id); // Service xử lý not found
-
-            if (!invoice) {
-                return res.status(404).json({
-                    status: 'error',
-                    message: `Không tìm thấy hóa đơn với ID ${id}`
-                });
-            }
-
-            // Kiểm tra quyền truy cập cho STUDENT role
-            if (req.user && typeof req.user === 'object' && 'role' in req.user && req.user.role === 'STUDENT' && 'profileId' in req.user) {
-                const studentProfileId = Number(req.user.profileId);
-
-                // Kiểm tra xem hóa đơn có thuộc về sinh viên hiện tại hoặc phòng của họ không
-                if (invoice.studentProfileId !== studentProfileId) {
-                    // Nếu không phải hóa đơn cá nhân, kiểm tra xem có phải hóa đơn của phòng mà sinh viên đang ở không
-                    const student = await prisma.studentProfile.findUnique({
-                        where: { id: studentProfileId },
-                        select: { roomId: true }
-                    });
-
-                    if (!student?.roomId || invoice.roomId !== student.roomId) {
-                        return res.status(403).json({
-                            status: 'error',
-                            message: 'Bạn không có quyền xem hóa đơn này.'
-                        });
-                    }
-                }
-            }
-
             res.status(200).json({
                 status: 'success',
                 data: invoice
