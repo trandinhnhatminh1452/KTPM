@@ -32,6 +32,30 @@ export class TransferController {
                 }
 
                 options.where!.studentProfileId = studentProfile.id;
+            } else if (userRole === Role.STAFF) {
+                // Nếu là STAFF, chỉ cho xem yêu cầu chuyển phòng trong tòa nhà quản lý
+                const staffProfile = await prisma.staffProfile.findUnique({
+                    where: { userId },
+                    select: { managedBuildingId: true }
+                });
+
+                if (staffProfile?.managedBuildingId) {
+                    // Lọc theo buildingId của cả phòng đi và phòng đến
+                    options.where = {
+                        OR: [
+                            {
+                                fromRoom: {
+                                    buildingId: staffProfile.managedBuildingId
+                                }
+                            },
+                            {
+                                toRoom: {
+                                    buildingId: staffProfile.managedBuildingId
+                                }
+                            }
+                        ]
+                    };
+                }
             } else {
                 // Xây dựng bộ lọc
                 if (studentProfileId) options.where!.studentProfileId = parseInt(studentProfileId as string);

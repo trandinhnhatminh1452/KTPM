@@ -4,8 +4,6 @@ import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import StaffRoute from './components/StaffRoute';
-import StudentRoute from './components/StudentRoute';
-import StudentOrStaffRoute from './components/StudentOrStaffRoute';
 
 // Import Layouts
 import DashboardLayout from './layouts/DashboardLayout'; // Chỉ cần import 1 lần
@@ -28,11 +26,9 @@ import MaintenanceForm from './pages/maintenance/MaintenanceForm';
 import MaintenanceRequestForm from './pages/maintenance/MaintenanceRequestForm';
 import InvoiceIndex from './pages/invoices/InvoiceIndex';
 import InvoiceDetail from './pages/invoices/InvoiceDetail';
-import InvoiceStudentView from './pages/invoices/InvoiceStudentView';
 import PaymentIndex from './pages/payments/PaymentIndex';
 import PaymentForm from './pages/payments/PaymentForm';
 import PaymentNew from './pages/payments/PaymentNew';
-import PaymentResult from './pages/payments/PaymentResult';
 import FeeRateIndex from './pages/fees/FeeRateIndex';
 import FeeRateDetail from './pages/fees/FeeRateDetail';
 import FeeRateForm from './pages/fees/FeeRateForm';
@@ -42,7 +38,6 @@ import UtilityReadingCreate from './pages/utilities/UtilityReadingCreate';
 import UtilityReadingEdit from './pages/utilities/UtilityReadingEdit';
 import VehicleIndex from './pages/vehicles/VehicleIndex';
 import VehicleForm from './pages/vehicles/VehicleForm';
-import StudentVehicleView from './pages/vehicles/StudentVehicleView';
 import TransferIndex from './pages/transfers/TransferIndex';
 import TransferRequestForm from './pages/transfers/TransferRequestForm';
 import NotFound from './pages/NotFound';
@@ -65,7 +60,9 @@ function App() {
       {/* <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
 
       {/* Protected Routes - Yêu cầu đăng nhập */}
-      <Route element={<PrivateRoute />}> {/* Wrapper Layout và kiểm tra đăng nhập */}        {/* Route mặc định sau khi đăng nhập */}
+      <Route element={<PrivateRoute />}> {/* Wrapper Layout và kiểm tra đăng nhập */}
+
+        {/* Route mặc định sau khi đăng nhập */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
 
@@ -92,16 +89,11 @@ function App() {
           <Route path=":id/edit" element={<StaffRoute><StudentForm /></StaffRoute>} />
         </Route>
 
-        {/* --- BUILDING ROUTES (Xem lại quyền tạo/sửa) --- */}
-        <Route path="/buildings" element={<StaffRoute />}>
+        {/* --- BUILDING ROUTES (Chỉ Admin được xem/tạo/sửa) --- */}
+        <Route path="/buildings" element={<AdminRoute />}>
           <Route index element={<BuildingIndex />} />
-          {/* Chỉ Admin được tạo/sửa? */}
-          <Route path="new" element={<AdminRoute><BuildingForm /></AdminRoute>} />
-          <Route path=":id/edit" element={<AdminRoute><BuildingForm /></AdminRoute>} />
-          {/* Hoặc nếu Staff cũng được:
-             <Route path="new" element={<BuildingForm />} />
-             <Route path=":id/edit" element={<BuildingForm />} />
-            */}
+          <Route path="new" element={<BuildingForm />} />
+          <Route path=":id/edit" element={<BuildingForm />} />
         </Route>
 
         {/* --- ROOM ROUTES --- */}
@@ -123,30 +115,25 @@ function App() {
              <Route path="new" element={<AmenityForm />} />
              <Route path=":id/edit" element={<AmenityForm />} />
              */}
-        </Route>        {/* --- MAINTENANCE ROUTES --- */}
+        </Route>
+
+        {/* --- MAINTENANCE ROUTES --- */}
         <Route path="/maintenance">
-          <Route index element={<StudentOrStaffRoute><MaintenanceIndex /></StudentOrStaffRoute>} />
-          <Route path="request" element={<StudentOrStaffRoute><MaintenanceRequestForm /></StudentOrStaffRoute>} />
+          <Route index element={<StaffRoute><MaintenanceIndex /></StaffRoute>} />
+          <Route path="request" element={<MaintenanceRequestForm />} />
           <Route path=":id/edit" element={<StaffRoute><MaintenanceForm /></StaffRoute>} />
-        </Route>        {/* --- INVOICE & PAYMENT ROUTES --- */}
-        <Route path="/invoices">
-          <Route index element={
-            <ProfileRouter
-              studentComponent={<InvoiceStudentView />}
-              staffComponent={<InvoiceIndex />}
-              adminComponent={<InvoiceIndex />}
-            />
-          } />
+        </Route>
+
+        {/* --- INVOICE & PAYMENT ROUTES --- */}
+        <Route path="/invoices" element={<StaffRoute />}>
+          <Route index element={<InvoiceIndex />} />
           <Route path=":id" element={<InvoiceDetail />} />
           {/* <Route path="new" element={<InvoiceForm />} /> */}
-        </Route><Route path="/payments" element={<StaffRoute />}>
+        </Route>        <Route path="/payments" element={<StaffRoute />}>
           <Route index element={<PaymentIndex />} />
           <Route path="new" element={<PaymentNew />} />
           <Route path=":id/edit" element={<PaymentForm />} />
         </Route>
-
-        {/* --- VNPay Payment Result Route for Students --- */}
-        <Route path="/payment-result" element={<StudentRoute><PaymentResult /></StudentRoute>} />
 
         {/* --- UTILITY ROUTES --- */}
         <Route path="/utilities" element={<StaffRoute />}>
@@ -155,17 +142,12 @@ function App() {
           <Route path=":id/edit" element={<UtilityReadingForm />} />
           <Route path="create" element={<UtilityReadingCreate />} />
           <Route path="edit/:id" element={<UtilityReadingEdit />} />
-        </Route>        {/* --- VEHICLE ROUTES --- */}        <Route path="/vehicles">
-          <Route index element={
-            <ProfileRouter
-              studentComponent={<VehicleIndex />}
-              staffComponent={<VehicleIndex />}
-            />
-          } />
+        </Route>        {/* --- VEHICLE ROUTES --- */}
+        <Route path="/vehicles">
+          <Route index element={<StaffRoute><VehicleIndex /></StaffRoute>} />
           <Route path="register" element={<VehicleForm mode="create" />} />
           <Route path=":id/edit" element={<StaffRoute><VehicleForm mode="edit" /></StaffRoute>} />
           <Route path="new" element={<StaffRoute><VehicleForm mode="create" /></StaffRoute>} />
-          <Route path="student/:id?" element={<VehicleIndex />} />
         </Route>
 
         {/* --- FEE RATE ROUTES --- */}

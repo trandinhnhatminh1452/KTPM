@@ -6,6 +6,7 @@ import PaginationTable from '../../components/shared/PaginationTable';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../contexts/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -41,6 +42,7 @@ const statusOptions = [
 ];
 
 const FeeRateIndex = () => {
+    const { user } = useAuth(); // Get current user to check role
     const [feeRates, setFeeRates] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -162,6 +164,8 @@ const FeeRateIndex = () => {
                         >
                             <EyeIcon className="h-5 w-5 text-gray-500 hover:text-gray-700" />
                         </Button>
+                        {user?.role === 'ADMIN' && (
+                    <>
                         <Button
                             variant="icon"
                             onClick={() => navigate(`/fees/${fee.id}/edit`)}
@@ -176,6 +180,8 @@ const FeeRateIndex = () => {
                         >
                             <TrashIcon className="h-5 w-5 text-red-600 hover:text-red-800" />
                         </Button>
+                    </>
+                )}
                     </div>
                 );
             },
@@ -186,7 +192,9 @@ const FeeRateIndex = () => {
         <div className="space-y-4">
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <h1 className="text-2xl font-semibold">Quản lý Đơn Giá</h1>
-                <Button onClick={() => navigate('/fees/new')} icon={PlusIcon}>Thêm Đơn Giá Mới</Button>
+                {user?.role === 'ADMIN' && (
+                    <Button onClick={() => navigate('/fees/new')} icon={PlusIcon}>Thêm Đơn Giá Mới</Button>
+                )}
             </div>
 
             {/* Filters */}

@@ -16,8 +16,27 @@ export class UtilityController {
 
             const options: Prisma.UtilityMeterReadingFindManyArgs = { where: {} };
 
+            // Thêm điều kiện lọc theo buildingID cho staff
+            if (req.user?.role === 'STAFF') {
+                const buildingId = req.user.email === 'staff.b3@example.com' ? 1 : 2;
+                options.where!.room = {
+                    buildingId
+                };
+            }
+
             // Xây dựng bộ lọc
-            if (roomId) options.where!.roomId = parseInt(roomId as string);
+            if (roomId) {
+                if (options.where!.room) {
+                    options.where!.room = {
+                        AND: [
+                            options.where!.room,
+                            { id: parseInt(roomId as string) }
+                        ]
+                    };
+                } else {
+                    options.where!.roomId = parseInt(roomId as string);
+                }
+            }
 
             // Tìm kiếm theo số phòng nâng cao
             if (roomNumber) {
@@ -73,7 +92,18 @@ export class UtilityController {
                 ];
             }
 
-            // Tìm theo loại công tơ
+            // Nếu đã có điều kiện room và là STAFF, cần gộp điều kiện với AND
+            if (options.where!.room && req.user?.role === 'STAFF') {
+                const buildingId = req.user.email === 'staff.b3@example.com' ? 1 : 2;
+                options.where!.room = {
+                    AND: [
+                        options.where!.room,
+                        { buildingId }
+                    ]
+                };
+            }
+
+            // Tìm kiếm theo loại công tơ
             if (type) {
                 // Handle the case where type might be stringified object
                 let typeValue = type;

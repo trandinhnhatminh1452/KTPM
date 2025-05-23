@@ -81,31 +81,30 @@ const DashboardLayout = () => {
       { name: 'Trang chủ', href: '/dashboard', icon: HomeIcon, roles: ['ADMIN', 'STAFF', 'STUDENT'] },
       { name: 'Hồ sơ cá nhân', href: '/profile', icon: UserCircleIcon, roles: ['ADMIN', 'STAFF', 'STUDENT'] },
       { name: 'Quản lý sinh viên', href: '/students', icon: UsersIcon, roles: ['ADMIN', 'STAFF'] },
-      { name: 'Quản lý tòa nhà', href: '/buildings', icon: BuildingOffice2Icon, roles: ['ADMIN', 'STAFF'] },
+      { name: 'Quản lý tòa nhà', href: '/buildings', icon: BuildingOffice2Icon, roles: ['ADMIN'] },
       { name: 'Quản lý phòng ở', href: '/rooms', icon: RectangleGroupIcon, roles: ['ADMIN', 'STAFF', 'STUDENT'] },
-      { name: 'Tiện nghi KTX', href: '/amenities', icon: Cog6ToothIcon, roles: ['ADMIN', 'STAFF'] },
+      { name: 'Tiện nghi KTX', href: '/amenities', icon: Cog6ToothIcon, roles: ['ADMIN'] },
       { name: 'Quản lý bảo trì', href: '/maintenance', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'STAFF'] },
-      { name: 'Yêu cầu sửa chữa', href: '/maintenance', icon: WrenchScrewdriverIcon, roles: ['STUDENT'] },
-      { name: 'Quản lý hóa đơn', href: '/invoices', icon: DocumentTextIcon, roles: ['ADMIN', 'STAFF', 'STUDENT'] },
+      { name: 'Yêu cầu sửa chữa', href: '/maintenance/request', icon: WrenchScrewdriverIcon, roles: ['STUDENT'] }, { name: 'Quản lý hóa đơn', href: '/invoices', icon: DocumentTextIcon, roles: ['ADMIN', 'STAFF'] },
       { name: 'Quản lý thanh toán', href: '/payments', icon: CurrencyDollarIcon, roles: ['ADMIN', 'STAFF'] },
       { name: 'Quản lý đơn giá', href: '/fees', icon: CurrencyDollarIcon, roles: ['ADMIN', 'STAFF'] },
       { name: 'Điện nước', href: '/utilities', icon: CalculatorIcon, roles: ['ADMIN', 'STAFF'] },
-      { name: 'Quản lý phương tiện', href: '/vehicles', icon: TruckIcon, roles: ['ADMIN', 'STAFF', 'STUDENT'] },
-      { name: 'Quản lý chuyển phòng', href: '/transfers', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'STAFF'] },
+      { name: 'Quản lý phương tiện', href: '/vehicles', icon: TruckIcon, roles: ['ADMIN', 'STAFF'] },
+      { name: 'Đăng ký phương tiện', href: '/vehicles/register', icon: TruckIcon, roles: ['STUDENT'] }, { name: 'Quản lý chuyển phòng', href: '/transfers', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'STAFF'] },
       { name: 'Đăng ký chuyển phòng', href: '/transfers', icon: ArrowsRightLeftIcon, roles: ['STUDENT'] },
     ];
 
     if (!user || !user.role) return [];
     return allNavItems.filter(item => item.roles.includes(user.role));
-  }, [user]);
+  }, [user]); // Phụ thuộc vào user
 
-  // --- Hàm xử lý Logout ---
+  // --- Hàm xử lý Logout (Giữ nguyên, đã tốt) ---
   const handleLogout = () => {
     setIsProfileOpen(false);
     logout();
   };
 
-  // --- Cập nhật lại hàm getAvatarUrl ---
+  // --- Cập nhật lại hàm getAvatarUrl để xử lý đúng yêu cầu ---
   const getAvatarUrl = () => {
     // Nếu user có avatarUrl là một đường link hoàn chỉnh (bắt đầu với http/https), sử dụng trực tiếp
     if (user?.avatarUrl && typeof user.avatarUrl === 'string' && user.avatarUrl.trim() !== '') {
@@ -141,6 +140,12 @@ const DashboardLayout = () => {
   // --- Render Layout ---
   return (
     <div className="min-h-screen bg-gray-100"> {/* Đổi nền sang gray-100 cho dịu mắt hơn */}
+      {/* Background pattern có thể giữ hoặc bỏ tùy ý */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none opacity-5"
+        style={{ /* style của bạn */ }}
+      />
+
       <div className="relative z-10 flex flex-col lg:flex-row min-h-screen"> {/* Thêm min-h-screen */}
 
         {/* --- Sidebar Desktop (fixed) --- */}
@@ -243,12 +248,11 @@ const DashboardLayout = () => {
                     aria-orientation="vertical"
                     aria-labelledby="user-menu-button"
                     tabIndex="-1"
-                  >                    {/* Nội dung dropdown với logic hiển thị tên người dùng đã được sửa */}
+                  >
+                    {/* Nội dung dropdown giữ nguyên */}
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="text-sm font-semibold text-gray-900 truncate">
-                        {user?.role === 'ADMIN'
-                          ? 'Admin'
-                          : (user?.profile?.fullName || user?.staffProfile?.fullName || user?.studentProfile?.fullName || user?.name || user?.email?.split('@')[0] || 'Người dùng')}
+                        {user?.profile?.fullName || user?.staffProfile?.fullName || user?.studentProfile?.fullName || user?.name || user?.email?.split('@')[0] || 'Người dùng'}
                       </p>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{user?.email}</p>
                       <span className={`mt-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${user?.role === 'ADMIN' ? 'bg-purple-100 text-purple-800 ring-purple-600/20' :

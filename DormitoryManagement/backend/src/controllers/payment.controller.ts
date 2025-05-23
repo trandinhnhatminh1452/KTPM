@@ -28,6 +28,16 @@ export const getPayments = async (req: Request, res: Response, next: NextFunctio
     // Xây dựng mệnh đề lọc (where)
     const whereClause: Prisma.PaymentWhereInput = {};
 
+    // Kiểm tra và thêm điều kiện lọc theo buildingID cho staff
+    if (req.user?.email && req.user?.role === 'STAFF') {
+      const buildingId = req.user.email === 'staff.b3@example.com' ? 1 : 2;
+      whereClause.studentProfile = {
+        room: {
+          buildingId
+        }
+      };
+    }
+
     // Lọc theo ID payment
     if (id) {
       whereClause.id = parseInt(id as string);
@@ -40,6 +50,17 @@ export const getPayments = async (req: Request, res: Response, next: NextFunctio
           contains: studentId as string,
           mode: 'insensitive'
         }
+      };
+    }
+
+    // Nếu đã có studentProfile trong whereClause và là STAFF, cần gộp điều kiện với AND
+    if (whereClause.studentProfile && req.user?.email && req.user?.role === 'STAFF') {
+      const buildingId = req.user.email === 'staff.b3@example.com' ? 1 : 2;
+      whereClause.studentProfile = {
+        AND: [
+          whereClause.studentProfile,
+          { room: { buildingId } }
+        ]
       };
     }
 
