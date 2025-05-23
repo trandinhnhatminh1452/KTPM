@@ -9,11 +9,13 @@ import buildingRoutes from './building.routes';
 import maintenanceRoutes from './maintenance.routes';
 import mediaRoutes from './media.routes';
 import invoiceRoutes from './invoice.routes';
+import studentInvoiceRoutes from './student-invoice.routes';
 import utilityRoutes from './utility.routes';
 import transferRoutes from './transfer.routes';
 import vehicleRoutes from './vehicle.routes';
 import dashboardRoutes from './dashboard.routes';
 import feeRoutes from './fee.routes';
+import vnpayRoutes from './vnpay';
 
 const router = express.Router();
 
@@ -34,10 +36,12 @@ router.use('/buildings', buildingRoutes);
 router.use('/maintenances', maintenanceRoutes);
 router.use('/media', mediaRoutes);
 router.use('/invoices', invoiceRoutes);
+router.use('/student/invoices', studentInvoiceRoutes);
 router.use('/utilities', utilityRoutes);
 router.use('/transfers', transferRoutes);
 router.use('/vehicles', vehicleRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/fees', feeRoutes);
+router.use('/vnpay', vnpayRoutes);
 
 export default router;

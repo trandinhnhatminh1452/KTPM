@@ -32,16 +32,25 @@ const TransferRequestForm = () => {
         roomNumber: targetRoom?.number || '',
         reason: '',
         transferDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Mặc định 7 ngày kể từ hôm nay
-    });
-
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    }); const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
 
     const [hasActiveRequest, setHasActiveRequest] = useState(false);
-    const [isCheckingActiveRequest, setIsCheckingActiveRequest] = useState(true);
-
-    // Giới tính của sinh viên hiện tại
+    const [isCheckingActiveRequest, setIsCheckingActiveRequest] = useState(true);    // Giới tính của sinh viên hiện tại
     const studentGender = user?.studentProfile?.gender || user?.profile?.gender;
+    const [genderChecked, setGenderChecked] = useState(false);
+
+    // Log để debug giới tính
+    useEffect(() => {
+        console.log("Giới tính sinh viên:", studentGender);
+        console.log("User profile:", user?.profile);
+        console.log("User studentProfile:", user?.studentProfile);
+
+        // Khi giới tính sinh viên được xác định
+        if (studentGender) {
+            setGenderChecked(true);
+        }
+    }, [studentGender, user]);
 
     // Tòa nhà hiện tại của sinh viên
     const currentBuildingId = user?.profile?.room?.building?.id ||
@@ -49,18 +58,61 @@ const TransferRequestForm = () => {
 
     // Phòng hiện tại của sinh viên
     const currentRoomId = user?.profile?.roomId || user?.studentProfile?.roomId;
-    const currentRoom = user?.profile?.room || user?.studentProfile?.room;
-
-    // Fetch danh sách tòa nhà    // Pre-select target room if provided
+    const currentRoom = user?.profile?.room || user?.studentProfile?.room;    // Fetch danh sách tòa nhà    // Pre-select target room if provided
     useEffect(() => {
-        if (targetRoom) {
+        // Chỉ tiến hành kiểm tra khi có targetRoom và đã xác định được giới tính sinh viên
+        if (targetRoom && genderChecked) {
             setSelectedRoom(targetRoom);
+
+            // Kiểm tra giới tính của phòng và sinh viên
+            if (targetRoom.type) {
+                // Phòng quản lý - sinh viên không được phép ở
+                if (targetRoom.type === 'MANAGEMENT') {
+                    setRoomValidationStatus({
+                        isValid: false,
+                        message: `Phòng này dành cho quản lý/nhân viên, sinh viên không thể chuyển vào`
+                    });
+                    return;
+                }
+
+                // Kiểm tra tương thích giới tính
+                if (studentGender &&
+                    ((targetRoom.type === 'MALE' && studentGender !== 'MALE') ||
+                        (targetRoom.type === 'FEMALE' && studentGender !== 'FEMALE'))) {
+                    // Không tương thích giới tính
+                    setRoomValidationStatus({
+                        isValid: false,
+                        message: `Phòng này dành cho sinh viên ${targetRoom.type === 'MALE' ? 'Nam' : 'Nữ'}, không phù hợp với giới tính của bạn (${studentGender === 'MALE' ? 'Nam' : 'Nữ'})`
+                    });
+                    return;
+                }
+            }
+
+            // Kiểm tra sức chứa phòng
+            if (targetRoom.actualOccupancy >= targetRoom.capacity) {
+                setRoomValidationStatus({
+                    isValid: false,
+                    message: "Phòng này đã đầy, không còn chỗ trống"
+                });
+                return;
+            }
+
+            // Nếu qua hết các kiểm tra, phòng hợp lệ
+            let roomTypeInfo = 'Không xác định loại phòng';
+            if (targetRoom.type === 'MALE') {
+                roomTypeInfo = 'dành cho sinh viên Nam';
+            } else if (targetRoom.type === 'FEMALE') {
+                roomTypeInfo = 'dành cho sinh viên Nữ';
+            } else if (targetRoom.type === 'MANAGEMENT') {
+                roomTypeInfo = 'dành cho quản lý/nhân viên';
+            }
+
             setRoomValidationStatus({
                 isValid: true,
-                message: `Phòng ${targetRoom.number} đã được chọn từ danh sách phòng`
+                message: `Phòng ${targetRoom.number} (${roomTypeInfo}, ${targetRoom.capacity} chỗ, còn ${targetRoom.capacity - targetRoom.actualOccupancy} chỗ trống) hợp lệ để chuyển đến`
             });
         }
-    }, [targetRoom]);
+    }, [targetRoom, studentGender, genderChecked]);
 
     useEffect(() => {
         const fetchBuildings = async () => {
@@ -98,9 +150,7 @@ const TransferRequestForm = () => {
         } else {
             setIsLoadingBuildings(false);
         }
-    }, [user, currentBuildingId]);
-
-    // Kiểm tra xem sinh viên đã có yêu cầu chuyển phòng PENDING/APPROVED chưa
+    }, [user, currentBuildingId]);    // Kiểm tra xem sinh viên đã có yêu cầu chuyển phòng PENDING chưa (chỉ kiểm tra PENDING, không kiểm tra APPROVED)
     useEffect(() => {
         const checkActiveRequest = async () => {
             setIsCheckingActiveRequest(true);
@@ -112,12 +162,10 @@ const TransferRequestForm = () => {
                     setIsCheckingActiveRequest(false);
                     return;
                 }
-                // Lấy tất cả request của sinh viên, lọc trạng thái PENDING/APPROVED
-                const { transfers } = await transferService.getAllTransferRequests({ studentId, status: '' });
-                const active = transfers.some(
-                    (tr) => tr.status === 'PENDING' || tr.status === 'APPROVED'
-                );
-                setHasActiveRequest(active);
+                // Lấy tất cả request của sinh viên với trạng thái PENDING
+                const { transfers } = await transferService.getAllTransferRequests({ studentId, status: 'PENDING' });
+                const hasPendingRequest = transfers.length > 0;
+                setHasActiveRequest(hasPendingRequest);
             } catch (err) {
                 setHasActiveRequest(false); // Nếu lỗi, cho phép tạo (hoặc có thể chặn tuỳ ý)
             } finally {
@@ -129,9 +177,7 @@ const TransferRequestForm = () => {
         } else {
             setIsCheckingActiveRequest(false);
         }
-    }, [user]);
-
-    // Handler thay đổi input
+    }, [user]);    // Handler thay đổi input
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -213,9 +259,7 @@ const TransferRequestForm = () => {
                     message: "Phòng này đã đầy, không còn chỗ trống"
                 });
                 return;
-            }
-
-            // Kiểm tra giới tính phòng dựa trên RoomType
+            }                // Kiểm tra giới tính phòng dựa trên RoomType
             if (exactRoom.type) {
                 // Phòng quản lý - sinh viên không được phép ở
                 if (exactRoom.type === 'MANAGEMENT') {
@@ -226,13 +270,24 @@ const TransferRequestForm = () => {
                     return;
                 }
 
-                // Kiểm tra tương thích giới tính (chỉ khi biết được giới tính sinh viên)
-                if (studentGender) {
+                // Kiểm tra tương thích giới tính
+                // Nếu không biết giới tính sinh viên, hiển thị cảnh báo
+                if (!studentGender) {
+                    console.warn("Không thể xác định giới tính của sinh viên. Kiểm tra hồ sơ người dùng.");
+                    if (exactRoom.type === 'MALE' || exactRoom.type === 'FEMALE') {
+                        setRoomValidationStatus({
+                            isValid: false,
+                            message: `Không thể xác định giới tính của bạn. Phòng này dành cho sinh viên ${exactRoom.type === 'MALE' ? 'Nam' : 'Nữ'}.`
+                        });
+                        return;
+                    }
+                } else {
+                    // Kiểm tra tương thích giới tính khi đã biết giới tính sinh viên
                     if ((exactRoom.type === 'MALE' && studentGender !== 'MALE') ||
                         (exactRoom.type === 'FEMALE' && studentGender !== 'FEMALE')) {
                         setRoomValidationStatus({
                             isValid: false,
-                            message: `Phòng này dành cho sinh viên ${exactRoom.type === 'MALE' ? 'Nam' : 'Nữ'}, không phù hợp với giới tính của bạn`
+                            message: `Phòng này dành cho sinh viên ${exactRoom.type === 'MALE' ? 'Nam' : 'Nữ'}, không phù hợp với giới tính của bạn (${studentGender === 'MALE' ? 'Nam' : 'Nữ'})`
                         });
                         return;
                     }
@@ -275,9 +330,7 @@ const TransferRequestForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
-        setErrors({});
-
-        // --- Validation ---
+        setErrors({});        // --- Validation ---
         if (!formData.buildingId) {
             setErrors(prev => ({ ...prev, buildingId: "Vui lòng chọn tòa nhà" }));
             setIsSubmitting(false);
@@ -291,9 +344,29 @@ const TransferRequestForm = () => {
         }
 
         if (!selectedRoom || !roomValidationStatus?.isValid) {
-            setErrors(prev => ({ ...prev, roomCheck: "Vui lòng kiểm tra phòng trước khi gửi yêu cầu" }));
+            let errorMessage = "Vui lòng kiểm tra phòng trước khi gửi yêu cầu";
+
+            // Nếu đó không phải là phòng được chọn từ danh sách, hiển thị hướng dẫn rõ ràng hơn
+            if (!targetRoom) {
+                errorMessage = "Vui lòng nhấn nút 'Kiểm tra phòng' trước khi gửi yêu cầu";
+            }
+
+            setErrors(prev => ({ ...prev, roomCheck: errorMessage }));
             setIsSubmitting(false);
             return;
+        }
+
+        // Kiểm tra lại tương thích giới tính lần nữa trước khi submit
+        if (selectedRoom?.type && studentGender) {
+            if ((selectedRoom.type === 'MALE' && studentGender !== 'MALE') ||
+                (selectedRoom.type === 'FEMALE' && studentGender !== 'FEMALE')) {
+                setErrors(prev => ({
+                    ...prev,
+                    roomCheck: `Phòng này dành cho sinh viên ${selectedRoom.type === 'MALE' ? 'Nam' : 'Nữ'}, không phù hợp với giới tính của bạn (${studentGender === 'MALE' ? 'Nam' : 'Nữ'})`
+                }));
+                setIsSubmitting(false);
+                return;
+            }
         }
 
         if (!formData.reason.trim()) {
@@ -379,20 +452,29 @@ const TransferRequestForm = () => {
         user?.studentProfile?.roomId ||
         user?.studentProfile?.room?.id;
 
-    if (!hasRoom) {
-        return <p className="text-center text-gray-600 p-6">Bạn cần đang ở trong một phòng để thực hiện yêu cầu chuyển phòng.</p>;
+    // Nếu không có phòng nhưng đã chọn phòng đích (từ danh sách phòng) -> cho phép đăng ký phòng mới
+    const isNewRegistration = !hasRoom && targetRoom;
+
+    // Chỉ hiển thị thông báo lỗi nếu không có phòng VÀ không phải đăng ký mới
+    if (!hasRoom && !isNewRegistration) {
+        return (
+            <div className="text-center p-6 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-yellow-700 mb-3">Bạn chưa được xếp phòng. Vui lòng chọn phòng từ danh sách phòng để đăng ký.</p>
+                <Button onClick={() => navigate('/rooms')} variant="primary">
+                    Xem danh sách phòng
+                </Button>
+            </div>
+        );
     }
 
     // Nếu đang kiểm tra hoặc chưa xác định xong quyền tạo request
     if (isCheckingActiveRequest) {
         return <div className="flex justify-center items-center h-40"><LoadingSpinner /></div>;
-    }
-
-    // Nếu đã có request đang chờ hoặc đã duyệt
+    }    // Nếu đã có request đang chờ xử lý (PENDING)
     if (hasActiveRequest) {
         return (
             <div className="text-center text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-6 max-w-xl mx-auto mt-8">
-                <h2 className="text-lg font-semibold mb-2">Bạn đã có yêu cầu chuyển phòng đang chờ xử lý hoặc đã được duyệt.</h2>
+                <h2 className="text-lg font-semibold mb-2">Bạn đã có yêu cầu chuyển phòng đang chờ xử lý.</h2>
                 <p>Vui lòng chờ quản lý xử lý yêu cầu hiện tại hoặc hủy yêu cầu đó trước khi tạo yêu cầu mới.</p>
                 <Button className="mt-4" onClick={() => navigate('/transfers')}>Xem các yêu cầu chuyển phòng của bạn</Button>
             </div>
@@ -400,25 +482,41 @@ const TransferRequestForm = () => {
     }
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto">
-            <div>
-                <Button variant="link" onClick={() => navigate(-1)} className="text-sm mb-4">
-                    <ArrowLeftIcon className="h-4 w-4 mr-1" /> Quay lại
-                </Button>
-                <h1 className="text-2xl font-semibold">Yêu cầu Chuyển phòng</h1>
-                <p className="mt-1 text-sm text-gray-600">Điền thông tin dưới đây để gửi yêu cầu chuyển sang phòng khác.</p>
-            </div>
+        <div className="space-y-6 max-w-2xl mx-auto">            <div>
+            <Button variant="link" onClick={() => navigate(-1)} className="text-sm mb-4">
+                <ArrowLeftIcon className="h-4 w-4 mr-1" /> Quay lại
+            </Button>
+            <h1 className="text-2xl font-semibold">
+                {isNewRegistration ? 'Đăng ký phòng ở' : 'Yêu cầu Chuyển phòng'}
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+                {isNewRegistration
+                    ? 'Điền thông tin dưới đây để đăng ký phòng ở mới.'
+                    : 'Điền thông tin dưới đây để gửi yêu cầu chuyển sang phòng khác.'
+                }
+            </p>
+        </div>
 
-            <form onSubmit={handleSubmit} className="bg-white shadow sm:rounded-lg p-6 space-y-6">
-                {/* Thông tin phòng hiện tại */}
+            <form onSubmit={handleSubmit} className="bg-white shadow sm:rounded-lg p-6 space-y-6">                {/* Thông tin phòng hiện tại hoặc đăng ký mới */}
                 <div className='p-4 bg-gray-50 rounded-md border'>
-                    <p className='text-sm font-medium text-gray-700'>Phòng hiện tại của bạn:</p>
-                    <p className='text-lg font-semibold text-gray-900'>
-                        {currentRoom
-                            ? `Phòng ${currentRoom.number} (${currentRoom.building?.name || 'N/A'})`
-                            : 'Đang tải thông tin...'}
-                    </p>
-                </div>                {/* Lỗi chung */}
+                    {isNewRegistration ? (
+                        <>
+                            <p className='text-sm font-medium text-gray-700'>Tình trạng hiện tại:</p>
+                            <p className='text-lg font-semibold text-gray-900'>
+                                Bạn chưa được xếp phòng ở
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className='text-sm font-medium text-gray-700'>Phòng hiện tại của bạn:</p>
+                            <p className='text-lg font-semibold text-gray-900'>
+                                {currentRoom
+                                    ? `Phòng ${currentRoom.number} (${currentRoom.building?.name || 'N/A'})`
+                                    : 'Đang tải thông tin...'}
+                            </p>
+                        </>
+                    )}
+                </div>{/* Lỗi chung */}
                 {errors.general && (
                     <div className="rounded-md bg-red-50 p-4 mb-4">
                         <div className="flex">
@@ -467,10 +565,7 @@ const TransferRequestForm = () => {
                             </div>
                         </div>
                     </div>
-                )}
-
-                {/* Chọn tòa nhà */}
-                <Select
+                )}                {/* Chọn tòa nhà */}                <Select
                     label="Tòa nhà muốn chuyển đến *"
                     id="buildingId"
                     name="buildingId"
@@ -483,41 +578,50 @@ const TransferRequestForm = () => {
                     loading={isLoadingBuildings}
                 />
 
-                {/* Nhập số phòng */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="md:col-span-2">
-                        <Input
-                            label="Số phòng muốn chuyển đến *"
-                            id="roomNumber"
-                            name="roomNumber"
-                            required
-                            value={formData.roomNumber}
-                            onChange={handleChange}
-                            disabled={isSubmitting || isCheckingRoom}
-                            error={errors.roomNumber}
-                            placeholder="VD: 101, A101, ..."
-                        />
+                {/* Nhập số phòng */}                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">                    <div className="md:col-span-2">
+                    <Input
+                        label="Số phòng muốn chuyển đến *"
+                        id="roomNumber"
+                        name="roomNumber"
+                        required
+                        value={formData.roomNumber}
+                        onChange={handleChange}
+                        disabled={isSubmitting || isCheckingRoom}
+                        error={errors.roomNumber}
+                        placeholder="VD: 101, A101, ..."
+                    />
+                </div><div className="md:col-span-1 flex items-end">
+                        {/* Luôn hiển thị nút Kiểm tra phòng */}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={checkRoom}
+                            loading={isCheckingRoom}
+                            disabled={isSubmitting || isCheckingRoom || !formData.buildingId || !formData.roomNumber.trim()}
+                            className="w-full"
+                        >
+                            {isCheckingRoom ? 'Đang kiểm tra...' : 'Kiểm tra phòng'}
+                        </Button>
                     </div>
-                    <div className="md:col-span-1 flex items-end">                        <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={checkRoom}
-                        loading={isCheckingRoom}
-                        disabled={isSubmitting || isCheckingRoom || !formData.buildingId || !formData.roomNumber.trim()}
-                        className="w-full"
-                    >
-                        {isCheckingRoom ? 'Đang kiểm tra...' : 'Kiểm tra phòng'}
-                    </Button>
-                    </div>
-                </div>
-
-                {/* Thông báo kiểm tra phòng */}
-                {roomValidationStatus && (
+                </div>                {/* Thông báo kiểm tra phòng */}
+                {roomValidationStatus ? (
                     <div className={`p-3 rounded-md ${roomValidationStatus.isValid
                         ? 'bg-green-50 border border-green-200 text-green-700'
                         : 'bg-red-50 border border-red-200 text-red-700'
                         }`}>
                         {roomValidationStatus.message}
+                    </div>
+                ) : targetRoom && (
+                    <div className="p-3 rounded-md bg-blue-50 border border-blue-200 text-blue-700">
+                        <strong>Vui lòng nhấn "Kiểm tra phòng":</strong> Phòng đã được chọn từ danh sách, nhưng cần kiểm tra tính phù hợp về giới tính và sức chứa trước khi gửi yêu cầu.
+                        {studentGender && targetRoom.type && (
+                            (studentGender === 'MALE' && targetRoom.type === 'FEMALE') ||
+                            (studentGender === 'FEMALE' && targetRoom.type === 'MALE')
+                        ) && (
+                                <div className="mt-2 font-semibold text-red-600">
+                                    ⚠️ Lưu ý: Giới tính của bạn ({studentGender === 'MALE' ? 'Nam' : 'Nữ'}) có vẻ không phù hợp với loại phòng ({targetRoom.type === 'MALE' ? 'Nam' : 'Nữ'})
+                                </div>
+                            )}
                     </div>
                 )}
 
@@ -537,11 +641,9 @@ const TransferRequestForm = () => {
                     disabled={isSubmitting}
                     error={errors.transferDate}
                     min={new Date().toISOString().split('T')[0]} // Không cho chọn ngày trong quá khứ
-                />
-
-                {/* Lý do chuyển phòng */}
+                />                {/* Lý do chuyển phòng hoặc đăng ký mới */}
                 <Textarea
-                    label="Lý do chuyển phòng *"
+                    label={isNewRegistration ? "Lý do đăng ký phòng này *" : "Lý do chuyển phòng *"}
                     id="reason"
                     name="reason"
                     rows={4}
@@ -550,7 +652,10 @@ const TransferRequestForm = () => {
                     onChange={handleChange}
                     disabled={isSubmitting}
                     error={errors.reason}
-                    placeholder="Nêu rõ lý do bạn muốn chuyển phòng..."
+                    placeholder={isNewRegistration
+                        ? "Nêu lý do bạn muốn đăng ký phòng này..."
+                        : "Nêu rõ lý do bạn muốn chuyển phòng..."
+                    }
                 />
 
                 {/* Nút Submit */}
