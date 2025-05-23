@@ -14,6 +14,7 @@ const Login = () => {
   const location = useLocation();
 
   const [isSubmitting, setIsSubmitting] = useState(false); // Loading cục bộ cho form
+
   // Chuyển hướng nếu đã đăng nhập (Kiểm tra sau khi auth context load xong)
   useEffect(() => {
     if (!isAuthLoading && user) {
@@ -24,54 +25,26 @@ const Login = () => {
     // Chỉ chạy lại khi isAuthLoading hoặc user thay đổi
   }, [isAuthLoading, user, navigate, location.state]);
 
-  // Listen for auth refresh events
-  useEffect(() => {
-    const handleAuthRefreshed = (event) => {
-      if (event.detail && event.detail.user) {
-        // If we're on the login page but receive an auth refresh event with a valid user,
-        // that means auth was successful, so redirect
-        const from = location.state?.from?.pathname || '/';
-        navigate(from, { replace: true });
-      }
-    };
-
-    window.addEventListener('auth-refreshed', handleAuthRefreshed);
-    return () => {
-      window.removeEventListener('auth-refreshed', handleAuthRefreshed);
-    };
-  }, [navigate, location.state]);
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFormError(''); // Clear previous form errors
-    if (isSubmitting) return; // Prevent double-submit
-
-    // Input validation
-    if (!email.trim()) {
-      setFormError('Vui lòng nhập email của bạn.');
-      return;
-    }
-
-    if (!password) {
-      setFormError('Vui lòng nhập mật khẩu của bạn.');
-      return;
-    }
+    setFormError(''); // Xóa lỗi form cũ
+    if (isSubmitting) return; // Chặn double-submit
 
     setIsSubmitting(true);
     try {
-      // Call login from auth context with the updated implementation
-      console.log('[Login Page] Attempting login...');
+      // Gọi login từ context
       const success = await login({ email, password });
 
+      // Nếu login thất bại, hiển thị thông báo lỗi trong form
+      // nhưng giữ người dùng ở trang đăng nhập để họ có thể thử lại
       if (!success) {
         setFormError('Email hoặc mật khẩu không chính xác. Vui lòng thử lại.');
-      } else {
-        console.log('[Login Page] Login successful. Auth context will handle redirection.');
-        // The auth context will handle both setting the user and redirecting
       }
+      // Nếu login thành công, useEffect ở trên sẽ tự động điều hướng
     } catch (caughtError) {
-      // Handle exceptions thrown by the login function
-      console.error('[Login Page] Login process error:', caughtError);
-      setFormError(caughtError.message || 'Đăng nhập thất bại. Vui lòng thử lại sau.');
+      // Trường hợp hàm login ném lỗi (dù interceptor/context đã xử lý toast)
+      console.error('[Login Page] Login failed:', caughtError);
+      setFormError(caughtError.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }

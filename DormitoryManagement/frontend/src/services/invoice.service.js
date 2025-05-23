@@ -15,10 +15,9 @@ const getAllInvoices = async (params = {}) => {
         if (apiParams.studentId) {
             apiParams.studentProfileId = apiParams.studentId;
             delete apiParams.studentId;
-        }        // Sử dụng endpoint dựa trên vai trò người dùng
-        const endpoint = '/api/invoices';
-        console.log('Gọi API:', endpoint, apiParams);
-        const response = await apiClient.get(endpoint, { params: apiParams });
+        }
+
+        const response = await apiClient.get('/api/invoices', { params: apiParams });
 
         // Backend trả về: { status: 'success', results: number, total: number, data: array }
         if (response.data?.status === 'success') {

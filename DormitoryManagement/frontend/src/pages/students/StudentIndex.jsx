@@ -71,6 +71,14 @@ const StudentIndex = () => {
         console.log(`Filtered to ${students.length} students with student ID containing "${searchTerm}"`);
       }
 
+      // Lọc theo tòa nhà quản lý nếu là nhân viên quản lý
+      if (user?.role === 'STAFF' && user?.staffProfile?.managedBuildingId) {
+        students = students.filter(student => {
+          return student?.room?.buildingId === user.staffProfile.managedBuildingId;
+        });
+        console.log(`Filtered to ${students.length} students in managed building`);
+      }
+
       // Extract and normalize metadata for pagination
       const total = students.length;
 
@@ -252,13 +260,15 @@ const StudentIndex = () => {
             >
               <EyeIcon className="h-5 w-5 text-blue-600 hover:text-blue-800" />
             </Button>
-            <Button
-              variant="icon"
-              onClick={() => navigate(`/students/${row?.original?.id}/edit`)}
-              tooltip="Chỉnh sửa"
-            >
-              <PencilSquareIcon className="h-5 w-5 text-yellow-600 hover:text-yellow-800" />
-            </Button>
+            {(user?.role === 'ADMIN' || user?.role === 'STAFF') && (
+              <Button
+                variant="icon"
+                onClick={() => navigate(`/students/${row?.original?.id}/edit`)}
+                tooltip="Chỉnh sửa"
+              >
+                <PencilSquareIcon className="h-5 w-5 text-yellow-600 hover:text-yellow-800" />
+              </Button>
+            )}
             {user?.role === 'ADMIN' && (
               <Button
                 variant="icon"

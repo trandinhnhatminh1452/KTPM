@@ -17,8 +17,27 @@ export class StudentController {
       const offset = applyPagination ? (page - 1) * limit : 0;
 
       const keyword = req.query.keyword as string;
+      const user = req.user as any; // Assuming user is attached by auth middleware
 
       const whereCondition: any = {};
+      
+      // Kiểm tra và thêm điều kiện buildingId cho STAFF
+      if (user?.role === 'STAFF' && user?.staffProfile?.managedBuildingId) {
+        whereCondition.room = {
+          buildingId: user.staffProfile.managedBuildingId
+        };
+      } // ADMIN sẽ không có điều kiện buildingId, có thể xem tất cả sinh viên
+
+      // Tìm kiếm theo keyword
+      if (keyword) {
+        whereCondition.OR = [
+          { fullName: { contains: keyword, mode: 'insensitive' } },
+          { studentId: { contains: keyword, mode: 'insensitive' } },
+          { user: { email: { contains: keyword, mode: 'insensitive' } } },
+          { phoneNumber: { contains: keyword, mode: 'insensitive' } }
+        ];
+      }
+
       if (keyword) {
         whereCondition.OR = [
           { fullName: { contains: keyword, mode: 'insensitive' } },
